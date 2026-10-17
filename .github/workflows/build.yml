@@ -65,12 +65,10 @@ jobs:
           if [ ! -f "$PROJECT_DIR/gradle.properties" ]; then
             echo "::warning::gradle.properties was not found."
           fi
-
       - name: Build mod JAR
         shell: bash
-        run: |
-          set -euo pipefail
-          gradle --no-daemon clean build
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle --no-daemon clean build
 
       - name: Show generated JAR files
         shell: bash
