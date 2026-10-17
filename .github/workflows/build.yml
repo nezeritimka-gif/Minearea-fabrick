@@ -1,22 +1,19 @@
 
-name: Build MineArea JAR
+name: Build Minecraft Mod
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-
-permissions:
-  contents: read
+    paths:
+      - '**.zip'
+      - '.github/workflows/build.yml'
 
 jobs:
   build:
-    name: Compile Fabric mod
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download repository files
+      - name: Download repository
         uses: actions/checkout@v4
 
       - name: Install Java 21
@@ -25,62 +22,29 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Install Gradle 9.2.0
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.2.0'
-
-      - name: Find and extract source ZIP
-        shell: bash
+      - name: Extract mod source
         run: |
-          set -euo pipefail
-          mkdir -p project
-
-          ARCHIVE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
-          if [ -z "$ARCHIVE" ]; then
-            echo "::error::No source ZIP found in repository root."
+          ZIP=$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "Source ZIP not found"
             exit 1
           fi
-
-          echo "Using archive: $ARCHIVE"
-          unzip -o "$ARCHIVE" -d project
-
-          BUILD_FILE="$(find project -type f -name 'build.gradle' -print -quit)"
+          mkdir project
+          unzip -q "$ZIP" -d project
+          BUILD_FILE=$(find project -type f -name build.gradle -print -quit)
           if [ -z "$BUILD_FILE" ]; then
-            echo "::error::build.gradle was not found inside the ZIP."
-            find project -maxdepth 4 -type f -print
+            echo "build.gradle not found"
             exit 1
           fi
+          echo "PROJECT_DIR=$(dirname "$BUILD_FILE")" >> "$GITHUB_ENV"
 
-          PROJECT_DIR="$(dirname "$BUILD_FILE")"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found project: $PROJECT_DIR"
-
-          if [ ! -f "$PROJECT_DIR/settings.gradle" ] &&
-             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            echo "::error::Gradle settings file is missing."
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/gradle.properties" ]; then
-            echo "::warning::gradle.properties was not found."
-          fi
       - name: Build mod JAR
-        shell: bash
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: gradle --no-daemon clean build
-
-      - name: Show generated JAR files
-        shell: bash
-        run: |
-          find build/libs -maxdepth 1 -type f -name '*.jar' -print
-
+        run: gradle --no-daemon build
         working-directory: ${{ env.PROJECT_DIR }}
 
-      - name: Upload JAR artifact
+      - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: MineArea-JAR
+          name: MineArea-Fabric-1.21.11
           path: ${{ env.PROJECT_DIR }}/build/libs/*.jar
-          if-no-files-found: error
           
